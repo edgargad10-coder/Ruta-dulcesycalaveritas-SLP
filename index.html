@@ -1,0 +1,883 @@
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Dulces y Calaverita - San Luis Potosí</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts: Creepster & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pumpkin: '#FF7518',
+                        purpleDark: '#1A0B2E',
+                        purpleMid: '#2D124D',
+                        spookyGreen: '#00FF66',
+                        calaveraPink: '#FF007F',
+                        candyYellow: '#FFD700',
+                    },
+                    fontFamily: {
+                        spooky: ['Creepster', 'cursive'],
+                        sans: ['Outfit', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Styles & Overrides */
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #0F051D;
+            color: #F3F4F6;
+            overflow-x: hidden;
+        }
+
+        /* Leaflet Dark Theme Overrides */
+        .leaflet-tile-pane {
+            filter: brightness(0.7) invert(1) contrast(1.3) hue-rotate(200deg) saturate(0.3);
+        }
+
+        .leaflet-container {
+            background-color: #1A0B2E !important;
+            border-radius: 1rem;
+            z-index: 10;
+        }
+
+        /* Custom Marker Popup styling */
+        .leaflet-popup-content-wrapper {
+            background: #2D124D !important;
+            color: #ffffff !important;
+            border: 2px solid #FF7518;
+            border-radius: 12px !important;
+            padding: 4px;
+            box-shadow: 0 10px 25px rgba(255, 117, 24, 0.3);
+        }
+
+        .leaflet-popup-tip {
+            background: #FF7518 !important;
+        }
+
+        /* Animations */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-8px) rotate(3deg); }
+        }
+
+        .animate-float {
+            animation: float 4s ease-in-out infinite;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(255, 117, 24, 0.4); }
+            50% { box-shadow: 0 0 25px rgba(255, 117, 24, 0.8); }
+        }
+
+        .glow-btn {
+            animation: pulseGlow 2.5s infinite;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1A0B2E;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #FF7518;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #ff8c3a;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased">
+
+    <!-- Header Navigation -->
+    <header class="bg-purpleDark/95 backdrop-blur border-b border-pumpkin/30 sticky top-0 z-50 px-4 lg:px-8 py-3 shadow-2xl">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-3">
+            <div class="flex items-center space-x-3">
+                <span class="text-3xl animate-float">🎃</span>
+                <div>
+                    <h1 class="font-spooky text-2xl md:text-3xl tracking-wider text-pumpkin drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                        Ruta Dulce SLP
+                    </h1>
+                    <p class="text-xs text-purple-200/80 -mt-1 font-medium">Calaverita y Dulce o Truco en San Luis Potosí</p>
+                </div>
+            </div>
+
+            <!-- Header Quick Stats & Actions -->
+            <div class="flex items-center gap-2 md:gap-4 ml-auto">
+                <button id="btn-open-safety" class="bg-purpleMid hover:bg-purple-800 text-purple-200 text-xs md:text-sm px-3 py-2 rounded-xl border border-purple-500/30 transition flex items-center gap-1.5">
+                    <i data-lucide="shield-alert" class="w-4 h-4 text-calaveraPink"></i>
+                    <span class="hidden sm:inline">Consejos de</span> Seguridad
+                </button>
+                <button id="btn-add-point-nav" class="glow-btn bg-pumpkin hover:bg-orange-600 text-purpleDark font-bold text-xs md:text-sm px-4 py-2.5 rounded-xl transition flex items-center gap-2 transform active:scale-95">
+                    <i data-lucide="map-pin-plus" class="w-4 h-4"></i>
+                    <span>Registrar mi Casa</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container Layout -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-3 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+        <!-- Left Column: Controls & Spots List (5 cols on lg) -->
+        <section class="lg:col-span-5 flex flex-col gap-4 order-2 lg:order-1">
+            
+            <!-- Filter & Search Panel -->
+            <div class="bg-purpleMid/70 backdrop-blur border border-purple-500/20 rounded-2xl p-4 shadow-xl">
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <!-- Search Input -->
+                    <div class="relative flex-1">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3.5 text-purple-300/60"></i>
+                        <input type="text" id="search-input" placeholder="Buscar por colonia, dulce, familia..." 
+                            class="w-full pl-9 pr-3 py-2.5 bg-purpleDark/80 text-white rounded-xl border border-purple-500/30 text-sm focus:outline-none focus:border-pumpkin focus:ring-1 focus:ring-pumpkin transition placeholder-purple-300/40">
+                    </div>
+
+                    <!-- Colony Filter Dropdown -->
+                    <select id="colony-filter" class="bg-purpleDark/80 text-white border border-purple-500/30 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-pumpkin transition">
+                        <option value="ALL">Todas las Colonias</option>
+                        <option value="Centro Histórico">Centro Histórico</option>
+                        <option value="Tequisquiapan">Tequis / Tequisquiapan</option>
+                        <option value="Lomas 1a-4a Secc">Lomas (1a, 2a, 3a, 4a)</option>
+                        <option value="Jardín Tangamanga">Jardín / Tangamanga</option>
+                        <option value="Himno Nacional">Himno Nacional</option>
+                        <option value="Muñoz / Arboledas">Muñoz / Arboledas</option>
+                        <option value="Villa de Pozos">Villa de Pozos</option>
+                        <option value="Las Mercedes">Las Mercedes / Gálvez</option>
+                        <option value="OTRA">Otras Zonas SLP</option>
+                    </select>
+                </div>
+
+                <!-- Active Status Filter Badges -->
+                <div class="flex items-center gap-2 mt-3 pt-3 border-t border-purple-500/20 text-xs">
+                    <span class="text-purple-300/70 font-medium">Estado:</span>
+                    <button data-status="ALL" class="status-filter-btn active bg-pumpkin/20 border border-pumpkin text-pumpkin px-2.5 py-1 rounded-lg">Todos</button>
+                    <button data-status="ACTIVE" class="status-filter-btn text-purple-300 border border-purple-500/30 px-2.5 py-1 rounded-lg hover:border-spookyGreen hover:text-spookyGreen transition">🟢 Repartiendo</button>
+                    <button data-status="EMPTY" class="status-filter-btn text-purple-300 border border-purple-500/30 px-2.5 py-1 rounded-lg hover:border-red-400 hover:text-red-400 transition">🔴 Agotados</button>
+                </div>
+            </div>
+
+            <!-- Counter Banner -->
+            <div class="flex justify-between items-center bg-gradient-to-r from-purpleDark to-purpleMid border border-pumpkin/30 rounded-xl p-3.5 px-5">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🍬</span>
+                    <span class="text-sm font-semibold text-purple-100">Casas Participantes</span>
+                </div>
+                <span id="spot-count-badge" class="bg-pumpkin text-purpleDark font-extrabold text-sm px-3 py-1 rounded-full">0</span>
+            </div>
+
+            <!-- Scrollable Cards List -->
+            <div id="spots-container" class="space-y-3 max-h-[500px] lg:max-h-[580px] overflow-y-auto pr-1">
+                <!-- Dynamic cards loaded via JS -->
+            </div>
+        </section>
+
+        <!-- Right Column: Interactive Map (7 cols on lg) -->
+        <section class="lg:col-span-7 flex flex-col gap-3 order-1 lg:order-2">
+
+            <!-- Banner / Info Box above map -->
+            <div class="bg-purpleMid/50 border border-purple-500/20 rounded-xl p-3 flex flex-wrap justify-between items-center text-xs gap-2">
+                <div class="flex items-center gap-2 text-purple-200">
+                    <i data-lucide="info" class="w-4 h-4 text-pumpkin"></i>
+                    <span>Haz clic directamente sobre el mapa para ubicar tu casa o punto.</span>
+                </div>
+                <button id="btn-recenter" class="text-pumpkin hover:underline text-xs flex items-center gap-1 font-semibold ml-auto">
+                    <i data-lucide="locate-fixed" class="w-3.5 h-3.5"></i> Centrar SLP
+                </button>
+            </div>
+
+            <!-- Leaflet Map Container -->
+            <div class="relative w-full h-[380px] sm:h-[480px] lg:h-[620px] rounded-2xl overflow-hidden border-2 border-pumpkin/40 shadow-2xl">
+                <div id="map" class="w-full h-full"></div>
+                
+                <!-- Quick Floating Overlay Button for Mobile -->
+                <button id="btn-mobile-add-click" class="absolute bottom-4 right-4 z-[400] bg-pumpkin text-purpleDark font-bold px-4 py-3 rounded-full shadow-2xl flex items-center gap-2 lg:hidden glow-btn text-sm">
+                    <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                    <span>Añadir Punto</span>
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-purpleDark border-t border-purple-500/20 py-4 px-4 text-center text-xs text-purple-300/60 mt-6">
+        <p>🎃 Ruta Dulce San Luis Potosí &bull; Tradiciones, Alegría y Seguridad para nuestras familias 💀</p>
+    </footer>
+
+
+    <!-- MODAL 1: Registrar Nuevo Punto -->
+    <div id="modal-add-point" class="fixed inset-0 bg-purpleDark/80 backdrop-blur-md z-[1000] hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-purpleMid border-2 border-pumpkin rounded-2xl max-w-lg w-full p-5 md:p-6 shadow-2xl relative my-auto animate-float" style="animation-duration: 0.3s; animation-iteration-count: 1;">
+            
+            <button id="btn-close-modal" class="absolute top-4 right-4 text-purple-300 hover:text-white bg-purpleDark/50 p-1.5 rounded-full transition">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+
+            <div class="flex items-center gap-3 mb-4">
+                <span class="text-3xl">👻</span>
+                <div>
+                    <h2 class="text-xl font-bold text-pumpkin font-spooky tracking-wide">Registrar Casa o Punto</h2>
+                    <p class="text-xs text-purple-200/70">Comparte alegría a los niños de San Luis Potosí</p>
+                </div>
+            </div>
+
+            <form id="add-spot-form" class="space-y-4">
+                <input type="hidden" id="form-lat">
+                <input type="hidden" id="form-lng">
+
+                <!-- Helper alert if coords set -->
+                <div id="coords-status" class="bg-purpleDark/80 border border-spookyGreen/40 text-spookyGreen text-xs p-2.5 rounded-xl flex items-center gap-2">
+                    <i data-lucide="map-pin" class="w-4 h-4 shrink-0"></i>
+                    <span id="coords-status-text">Ubicación seleccionada en el mapa.</span>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-purple-200 mb-1">Nombre de la Familia / Negocio *</label>
+                    <input type="text" id="form-name" required placeholder="Ej. Familia López, Casa Embrujada Muñoz..." 
+                        class="w-full bg-purpleDark text-white border border-purple-500/30 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-pumpkin">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-purple-200 mb-1">Colonia / Zona en SLP *</label>
+                        <select id="form-colony" required class="w-full bg-purpleDark text-white border border-purple-500/30 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-pumpkin">
+                            <option value="">Selecciona Colonia</option>
+                            <option value="Centro Histórico">Centro Histórico</option>
+                            <option value="Tequisquiapan">Tequis / Tequisquiapan</option>
+                            <option value="Lomas 1a-4a Secc">Lomas (1a, 2a, 3a, 4a)</option>
+                            <option value="Jardín Tangamanga">Jardín / Tangamanga</option>
+                            <option value="Himno Nacional">Himno Nacional</option>
+                            <option value="Muñoz / Arboledas">Muñoz / Arboledas</option>
+                            <option value="Villa de Pozos">Villa de Pozos</option>
+                            <option value="Las Mercedes">Las Mercedes / Gálvez</option>
+                            <option value="OTRA">Otra Zona de SLP</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-purple-200 mb-1">Horario de Entrega *</label>
+                        <input type="text" id="form-schedule" required placeholder="Ej. 6:30 PM - 9:00 PM" 
+                            class="w-full bg-purpleDark text-white border border-purple-500/30 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-pumpkin">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-purple-200 mb-1">Ícono Temático del Marcador</label>
+                    <div class="grid grid-cols-4 gap-2">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="form-icon" value="pumpkin" checked class="peer sr-only">
+                            <div class="p-2 border border-purple-500/30 rounded-xl text-center peer-checked:border-pumpkin peer-checked:bg-pumpkin/20 transition">
+                                <span class="text-xl block">🎃</span>
+                                <span class="text-[10px] text-purple-200">Calabaza</span>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="form-icon" value="ghost" class="peer sr-only">
+                            <div class="p-2 border border-purple-500/30 rounded-xl text-center peer-checked:border-pumpkin peer-checked:bg-pumpkin/20 transition">
+                                <span class="text-xl block">👻</span>
+                                <span class="text-[10px] text-purple-200">Fantasma</span>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="form-icon" value="skull" class="peer sr-only">
+                            <div class="p-2 border border-purple-500/30 rounded-xl text-center peer-checked:border-pumpkin peer-checked:bg-pumpkin/20 transition">
+                                <span class="text-xl block">💀</span>
+                                <span class="text-[10px] text-purple-200">Calaverita</span>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="form-icon" value="candy" class="peer sr-only">
+                            <div class="p-2 border border-purple-500/30 rounded-xl text-center peer-checked:border-pumpkin peer-checked:bg-pumpkin/20 transition">
+                                <span class="text-xl block">🍬</span>
+                                <span class="text-[10px] text-purple-200">Dulces</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-purple-200 mb-1">Tipo de Dulces / Sorpresas</label>
+                    <input type="text" id="form-candy-type" placeholder="Ej. Chocolates, Paletas, Dulce Tradicional, Calaveritas..." 
+                        class="w-full bg-purpleDark text-white border border-purple-500/30 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-pumpkin">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-purple-200 mb-1">Referencias de la Casa / Decoración</label>
+                    <textarea id="form-notes" rows="2" placeholder="Ej. Casa con portada iluminada de calaveras, fachada color naranja, frente al parque..." 
+                        class="w-full bg-purpleDark text-white border border-purple-500/30 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-pumpkin"></textarea>
+                </div>
+
+                <div class="flex gap-3 pt-2">
+                    <button type="button" id="btn-cancel-modal" class="w-1/3 bg-purpleDark hover:bg-purple-900 text-purple-200 py-2.5 rounded-xl text-sm font-semibold transition border border-purple-500/30">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="w-2/3 bg-pumpkin hover:bg-orange-600 text-purpleDark font-bold py-2.5 rounded-xl text-sm transition shadow-lg flex items-center justify-center gap-2">
+                        <i data-lucide="check" class="w-4 h-4"></i> Guardar Casa
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- MODAL 2: Safety & Recommendations -->
+    <div id="modal-safety" class="fixed inset-0 bg-purpleDark/80 backdrop-blur-md z-[1000] hidden flex items-center justify-center p-4">
+        <div class="bg-purpleMid border border-calaveraPink/50 rounded-2xl max-w-md w-full p-5 md:p-6 shadow-2xl relative">
+            <button id="btn-close-safety" class="absolute top-4 right-4 text-purple-300 hover:text-white">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+
+            <div class="flex items-center gap-2 mb-3">
+                <i data-lucide="shield-check" class="w-6 h-6 text-calaveraPink"></i>
+                <h3 class="text-lg font-bold text-white font-spooky tracking-wide">Consejos de Seguridad para Papás y Niños</h3>
+            </div>
+
+            <ul class="text-xs space-y-2.5 text-purple-100/90 list-disc list-inside bg-purpleDark/60 p-4 rounded-xl border border-purple-500/20">
+                <li><strong>Acompañamiento:</strong> Los niños siempre deben ir acompañados por un adulto responsable.</li>
+                <li><strong>Visibilidad:</strong> Usar linterna o aditamentos reflejantes en los disfraces al caminar de noche.</li>
+                <li><strong>Cruzar Calles:</strong> Utilizar los cruces peatonales en avenidas concurridas de SLP (ej. Venustiano Carranza, Himno Nacional, Salvador Nava).</li>
+                <li><strong>Revisión de Dulces:</strong> Inspeccionar que los dulces estén cerrados con su empaque original antes de consumirlos.</li>
+                <li><strong>Respeto Vecinal:</strong> Acudir únicamente a las casas con luces encendidas y adornadas.</li>
+            </ul>
+
+            <button id="btn-ok-safety" class="w-full mt-4 bg-calaveraPink hover:bg-pink-600 text-white font-semibold py-2 rounded-xl text-sm transition">
+                ¡Entendido, a disfrutar! 🎃
+            </button>
+        </div>
+    </div>
+
+
+    <!-- Toast Notification Container -->
+    <div id="toast" class="fixed bottom-5 right-5 z-[2000] hidden bg-pumpkin text-purpleDark font-bold px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 text-sm border-2 border-white/20">
+        <i data-lucide="bell" class="w-4 h-4"></i>
+        <span id="toast-message">Mensaje de notificación</span>
+    </div>
+
+
+    <!-- Application Logic Script -->
+    <script>
+        // Default Center Coordinates: San Luis Potosí, SLP, México
+        const SLP_CENTER = [22.1565, -100.9855];
+        const DEFAULT_ZOOM = 13;
+
+        // Default Mock Data in San Luis Potosí
+        const INITIAL_SPOTS = [
+            {
+                id: 'slp-1',
+                name: 'Familia Ramírez - Casa Embrujada',
+                colony: 'Centro Histórico',
+                schedule: '6:00 PM - 9:30 PM',
+                candyType: 'Chocolates, Paletas y Calaveritas de Azúcar',
+                notes: 'Casa colonial adornada con catrinas gigantes e iluminación morada frente al Jardín de San Francisco.',
+                lat: 22.1512,
+                lng: -100.9765,
+                icon: 'skull',
+                status: 'ACTIVE', // ACTIVE, EMPTY
+                votes: 8
+            },
+            {
+                id: 'slp-2',
+                name: 'Familia Morales - Lomas Pumpkin',
+                colony: 'Lomas 1a-4a Secc',
+                schedule: '6:30 PM - 9:00 PM',
+                candyType: 'Surtido de Chocolates y Caramelos',
+                notes: 'Cochera decorada como huerto de calabazas con música de Halloween.',
+                lat: 22.1480,
+                lng: -101.0180,
+                icon: 'pumpkin',
+                status: 'ACTIVE',
+                votes: 12
+            },
+            {
+                id: 'slp-3',
+                name: 'Dulcería Tradicional Tequis',
+                colony: 'Tequisquiapan',
+                schedule: '5:00 PM - 8:30 PM',
+                candyType: 'Dulces típicos potosinos (camote, glorias) y chocolates',
+                notes: 'A un costado del Jardín de Tequis. Tendremos disfraz de Frankenstein.',
+                lat: 22.1585,
+                lng: -100.9920,
+                icon: 'candy',
+                status: 'ACTIVE',
+                votes: 15
+            },
+            {
+                id: 'slp-4',
+                name: 'Los Fantasmas de Tangamanga',
+                colony: 'Jardín Tangamanga',
+                schedule: '7:00 PM - 10:00 PM',
+                candyType: 'Bolsitas preparadas con variedad de gomitas y chocolates',
+                notes: 'Calle cerca de la entrada principal del Parque Tangamanga I.',
+                lat: 22.1350,
+                lng: -101.0020,
+                icon: 'ghost',
+                status: 'ACTIVE',
+                votes: 5
+            },
+            {
+                id: 'slp-5',
+                name: 'Casa Calavera Villa de Pozos',
+                colony: 'Villa de Pozos',
+                schedule: '6:00 PM - 8:30 PM',
+                candyType: 'Paletas, chicles y galletas decoradas',
+                notes: 'Frente a la plaza principal de Pozos. Luces festivas y altar de muertos.',
+                lat: 22.1020,
+                lng: -100.8850,
+                icon: 'skull',
+                status: 'EMPTY',
+                votes: 3
+            }
+        ];
+
+        // App State Variables
+        let map;
+        let markersGroup;
+        let spots = [];
+        let tempSelectedCoords = null;
+        let tempClickMarker = null;
+
+        // Initialize App on DOM Load
+        window.onload = function() {
+            lucide.createIcons();
+            loadSpots();
+            initMap();
+            renderSpotsList();
+            setupEventListeners();
+        };
+
+        // Load Spots from LocalStorage or Default Mock
+        function loadSpots() {
+            const saved = localStorage.getItem('slp_rutadulce_spots');
+            if (saved) {
+                try {
+                    spots = JSON.parse(saved);
+                } catch(e) {
+                    spots = INITIAL_SPOTS;
+                }
+            } else {
+                spots = INITIAL_SPOTS;
+                saveSpots();
+            }
+        }
+
+        function saveSpots() {
+            localStorage.setItem('slp_rutadulce_spots', JSON.stringify(spots));
+        }
+
+        // Initialize Leaflet Map
+        function initMap() {
+            map = L.map('map', {
+                center: SLP_CENTER,
+                zoom: DEFAULT_ZOOM,
+                zoomControl: true
+            });
+
+            // Tile Layer (CartoDB Dark Matter for spooky theme)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                maxZoom: 19
+            }).addTo(map);
+
+            markersGroup = L.layerGroup().addTo(map);
+
+            // Render spots markers on map
+            renderMapMarkers();
+
+            // Click listener on Map to capture location for new spot
+            map.on('click', function(e) {
+                const { lat, lng } = e.latlng;
+                tempSelectedCoords = [lat, lng];
+
+                if (tempClickMarker) {
+                    map.removeLayer(tempClickMarker);
+                }
+
+                // Temporary marker where user clicked
+                const tempIcon = L.divIcon({
+                    className: 'custom-temp-icon',
+                    html: `<div class="bg-pumpkin text-purpleDark text-lg p-2 rounded-full shadow-2xl border-2 border-white animate-bounce">📍</div>`,
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 36]
+                });
+
+                tempClickMarker = L.marker([lat, lng], { icon: tempIcon }).addTo(map);
+                
+                openAddSpotModal(lat, lng);
+            });
+        }
+
+        // Render Icons mapping
+        function getIconEmoji(iconType) {
+            switch(iconType) {
+                case 'ghost': return '👻';
+                case 'skull': return '💀';
+                case 'candy': return '🍬';
+                default: return '🎃';
+            }
+        }
+
+        // Render Markers on Map
+        function renderMapMarkers() {
+            markersGroup.clearLayers();
+
+            const colonyFilter = document.getElementById('colony-filter').value;
+            const statusFilter = document.querySelector('.status-filter-btn.active').dataset.status;
+            const searchQuery = document.getElementById('search-input').value.toLowerCase().trim();
+
+            const filtered = spots.filter(spot => {
+                const matchColony = colonyFilter === 'ALL' || spot.colony === colonyFilter;
+                const matchStatus = statusFilter === 'ALL' || spot.status === statusFilter;
+                const matchSearch = spot.name.toLowerCase().includes(searchQuery) || 
+                                    spot.colony.toLowerCase().includes(searchQuery) ||
+                                    (spot.candyType && spot.candyType.toLowerCase().includes(searchQuery));
+                return matchColony && matchStatus && matchSearch;
+            });
+
+            filtered.forEach(spot => {
+                const emoji = getIconEmoji(spot.icon);
+                const isInactive = spot.status === 'EMPTY';
+                const opacityClass = isInactive ? 'opacity-50 grayscale' : '';
+                const bgBorder = isInactive ? 'bg-gray-800 border-gray-500' : 'bg-purpleDark border-pumpkin';
+
+                const customHtml = `
+                    <div class="relative group cursor-pointer ${opacityClass}">
+                        <div class="${bgBorder} border-2 rounded-full p-2 shadow-xl flex items-center justify-center text-xl transform hover:scale-110 transition">
+                            ${emoji}
+                        </div>
+                        ${isInactive ? '<span class="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] px-1 rounded-full font-bold">Agotado</span>' : ''}
+                    </div>
+                `;
+
+                const markerIcon = L.divIcon({
+                    className: 'custom-spot-icon',
+                    html: customHtml,
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20]
+                });
+
+                const marker = L.marker([spot.lat, spot.lng], { icon: markerIcon });
+
+                // Popup Content
+                const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lng}`;
+                const popupContent = `
+                    <div class="p-2 space-y-2 text-xs">
+                        <div class="flex items-center justify-between border-b border-purple-500/30 pb-1 gap-2">
+                            <span class="font-bold text-pumpkin text-sm">${escapeHtml(spot.name)}</span>
+                            <span class="text-base">${emoji}</span>
+                        </div>
+                        <p class="text-purple-200"><strong class="text-white">📍 Zona:</strong> ${escapeHtml(spot.colony)}</p>
+                        <p class="text-purple-200"><strong class="text-white">⏰ Horario:</strong> ${escapeHtml(spot.schedule)}</p>
+                        ${spot.candyType ? `<p class="text-purple-200"><strong class="text-white">🍬 Dulces:</strong> ${escapeHtml(spot.candyType)}</p>` : ''}
+                        ${spot.notes ? `<p class="text-purple-300/80 italic text-[11px] bg-purpleDark/60 p-1.5 rounded">"${escapeHtml(spot.notes)}"</p>` : ''}
+                        
+                        <div class="pt-2 flex items-center gap-2">
+                            <a href="${googleMapsUrl}" target="_blank" class="flex-1 bg-pumpkin text-purpleDark text-center font-bold py-1.5 px-2 rounded-lg text-[11px] hover:bg-orange-500 transition flex items-center justify-center gap-1">
+                                🗺️ Cómo llegar
+                            </a>
+                        </div>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                markersGroup.addLayer(marker);
+            });
+        }
+
+        // Render List Cards
+        function renderSpotsList() {
+            const container = document.getElementById('spots-container');
+            container.innerHTML = '';
+
+            const colonyFilter = document.getElementById('colony-filter').value;
+            const statusFilter = document.querySelector('.status-filter-btn.active').dataset.status;
+            const searchQuery = document.getElementById('search-input').value.toLowerCase().trim();
+
+            const filtered = spots.filter(spot => {
+                const matchColony = colonyFilter === 'ALL' || spot.colony === colonyFilter;
+                const matchStatus = statusFilter === 'ALL' || spot.status === statusFilter;
+                const matchSearch = spot.name.toLowerCase().includes(searchQuery) || 
+                                    spot.colony.toLowerCase().includes(searchQuery) ||
+                                    (spot.candyType && spot.candyType.toLowerCase().includes(searchQuery));
+                return matchColony && matchStatus && matchSearch;
+            });
+
+            document.getElementById('spot-count-badge').textContent = filtered.length;
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-purpleMid/40 border border-purple-500/20 rounded-2xl p-8 text-center text-purple-300">
+                        <span class="text-4xl block mb-2">🕷️</span>
+                        <p class="font-semibold text-sm">No se encontraron casas registradas.</p>
+                        <p class="text-xs text-purple-400 mt-1">Sé el primero en añadir tu ubicación en esta zona de SLP.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filtered.forEach(spot => {
+                const emoji = getIconEmoji(spot.icon);
+                const isActive = spot.status === 'ACTIVE';
+                const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lng}`;
+
+                const card = document.createElement('div');
+                card.className = `bg-purpleMid/80 border ${isActive ? 'border-purple-500/30 hover:border-pumpkin/60' : 'border-red-500/30 opacity-75'} rounded-2xl p-4 transition shadow-lg space-y-3 relative overflow-hidden`;
+
+                card.innerHTML = `
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-2xl p-2 bg-purpleDark/80 rounded-xl border border-purple-500/20 shrink-0">${emoji}</span>
+                            <div>
+                                <h3 class="font-bold text-sm text-white leading-tight">${escapeHtml(spot.name)}</h3>
+                                <span class="inline-block bg-purpleDark text-purple-200 text-[11px] px-2 py-0.5 rounded-md font-medium mt-0.5 border border-purple-500/20">
+                                    📍 ${escapeHtml(spot.colony)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <span class="text-[10px] px-2 py-1 rounded-full font-bold ${isActive ? 'bg-spookyGreen/20 text-spookyGreen border border-spookyGreen/40' : 'bg-red-500/20 text-red-300 border border-red-500/40'}">
+                            ${isActive ? '🟢 Repartiendo' : '🔴 Agotados'}
+                        </span>
+                    </div>
+
+                    <div class="text-xs space-y-1 text-purple-200/90 bg-purpleDark/40 p-2.5 rounded-xl border border-purple-500/10">
+                        <p class="flex items-center gap-1.5"><strong class="text-pumpkin">⏰ Horario:</strong> ${escapeHtml(spot.schedule)}</p>
+                        ${spot.candyType ? `<p class="flex items-center gap-1.5"><strong class="text-pumpkin">🍬 Dulces:</strong> ${escapeHtml(spot.candyType)}</p>` : ''}
+                        ${spot.notes ? `<p class="text-purple-300/80 italic text-[11px] mt-1 pt-1 border-t border-purple-500/10">"${escapeHtml(spot.notes)}"</p>` : ''}
+                    </div>
+
+                    <!-- Card Actions -->
+                    <div class="flex items-center justify-between gap-2 pt-1">
+                        <button onclick="zoomToSpot(${spot.lat}, ${spot.lng}, '${spot.id}')" class="text-xs bg-purpleDark hover:bg-purple-800 text-purple-200 px-3 py-1.5 rounded-xl border border-purple-500/30 transition flex items-center gap-1">
+                            <i data-lucide="eye" class="w-3.5 h-3.5 text-pumpkin"></i> Ver mapa
+                        </button>
+
+                        <div class="flex items-center gap-2">
+                            <button onclick="toggleConfirmVote('${spot.id}')" class="text-xs bg-purpleDark hover:bg-purple-800 text-spookyGreen px-2.5 py-1.5 rounded-xl border border-purple-500/30 transition flex items-center gap-1" title="Confirmar que hay dulces">
+                                👍 <span class="font-bold">${spot.votes || 0}</span>
+                            </button>
+
+                            <button onclick="toggleSpotStatus('${spot.id}')" class="text-xs bg-purpleDark hover:bg-purple-800 text-purple-300 px-2.5 py-1.5 rounded-xl border border-purple-500/30 transition text-[11px]">
+                                ${isActive ? 'Marcar Agotado' : 'Reactivar'}
+                            </button>
+
+                            <a href="${googleMapsUrl}" target="_blank" class="text-xs bg-pumpkin hover:bg-orange-600 text-purpleDark font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1">
+                                <i data-lucide="navigation" class="w-3.5 h-3.5"></i> Ir
+                            </a>
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+
+            lucide.createIcons();
+        }
+
+        // Global functions for card interactions
+        window.zoomToSpot = function(lat, lng, spotId) {
+            map.flyTo([lat, lng], 16, { duration: 1.2 });
+            // Scroll to map on mobile
+            if (window.innerWidth < 1024) {
+                document.getElementById('map').scrollIntoView({ behavior: 'smooth' });
+            }
+        };
+
+        window.toggleConfirmVote = function(spotId) {
+            const spot = spots.find(s => s.id === spotId);
+            if (spot) {
+                spot.votes = (spot.votes || 0) + 1;
+                saveSpots();
+                renderSpotsList();
+                showToast(`¡Gracias! Confirmaste que en "${spot.name}" sí hay dulces. 🍬`);
+            }
+        };
+
+        window.toggleSpotStatus = function(spotId) {
+            const spot = spots.find(s => s.id === spotId);
+            if (spot) {
+                spot.status = spot.status === 'ACTIVE' ? 'EMPTY' : 'ACTIVE';
+                saveSpots();
+                renderSpotsList();
+                renderMapMarkers();
+                showToast(`Estado de "${spot.name}" actualizado.`);
+            }
+        };
+
+        // Modal Open / Close Handlers
+        function openAddSpotModal(lat = null, lng = null) {
+            const modal = document.getElementById('modal-add-point');
+            const statusText = document.getElementById('coords-status-text');
+
+            if (lat && lng) {
+                document.getElementById('form-lat').value = lat;
+                document.getElementById('form-lng').value = lng;
+                statusText.textContent = `Coordenadas capturadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            } else {
+                // Default to current SLP map center if not clicked on map
+                const center = map.getCenter();
+                document.getElementById('form-lat').value = center.lat;
+                document.getElementById('form-lng').value = center.lng;
+                statusText.textContent = `Ubicación asignada al centro actual del mapa en SLP.`;
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('modal-add-point').classList.add('hidden');
+            if (tempClickMarker) {
+                map.removeLayer(tempClickMarker);
+                tempClickMarker = null;
+            }
+        }
+
+        // Setup Event Listeners
+        function setupEventListeners() {
+            // Modal Add buttons
+            document.getElementById('btn-add-point-nav').addEventListener('click', () => openAddSpotModal());
+            document.getElementById('btn-mobile-add-click').addEventListener('click', () => openAddSpotModal());
+            document.getElementById('btn-close-modal').addEventListener('click', closeModal);
+            document.getElementById('btn-cancel-modal').addEventListener('click', closeModal);
+
+            // Safety Modal
+            document.getElementById('btn-open-safety').addEventListener('click', () => {
+                document.getElementById('modal-safety').classList.remove('hidden');
+            });
+            document.getElementById('btn-close-safety').addEventListener('click', () => {
+                document.getElementById('modal-safety').classList.add('hidden');
+            });
+            document.getElementById('btn-ok-safety').addEventListener('click', () => {
+                document.getElementById('modal-safety').classList.add('hidden');
+            });
+
+            // Recenter Map
+            document.getElementById('btn-recenter').addEventListener('click', () => {
+                map.flyTo(SLP_CENTER, DEFAULT_ZOOM);
+            });
+
+            // Filter listeners
+            document.getElementById('colony-filter').addEventListener('change', () => {
+                renderSpotsList();
+                renderMapMarkers();
+            });
+
+            document.getElementById('search-input').addEventListener('input', () => {
+                renderSpotsList();
+                renderMapMarkers();
+            });
+
+            // Status Filter Badges
+            document.querySelectorAll('.status-filter-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.status-filter-btn').forEach(b => {
+                        b.classList.remove('active', 'bg-pumpkin/20', 'border-pumpkin', 'text-pumpkin');
+                        b.classList.add('text-purple-300', 'border-purple-500/30');
+                    });
+                    
+                    e.target.classList.add('active', 'bg-pumpkin/20', 'border-pumpkin', 'text-pumpkin');
+                    e.target.classList.remove('text-purple-300', 'border-purple-500/30');
+
+                    renderSpotsList();
+                    renderMapMarkers();
+                });
+            });
+
+            // Form Submit Logic
+            document.getElementById('add-spot-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                const name = document.getElementById('form-name').value.trim();
+                const colony = document.getElementById('form-colony').value;
+                const schedule = document.getElementById('form-schedule').value.trim();
+                const candyType = document.getElementById('form-candy-type').value.trim();
+                const notes = document.getElementById('form-notes').value.trim();
+                const lat = parseFloat(document.getElementById('form-lat').value);
+                const lng = parseFloat(document.getElementById('form-lng').value);
+                const icon = document.querySelector('input[name="form-icon"]:checked').value;
+
+                if (!name || !colony || !schedule) {
+                    showToast('Por favor completa todos los campos requeridos.');
+                    return;
+                }
+
+                const newSpot = {
+                    id: 'slp-' + Date.now(),
+                    name,
+                    colony,
+                    schedule,
+                    candyType,
+                    notes,
+                    lat,
+                    lng,
+                    icon,
+                    status: 'ACTIVE',
+                    votes: 1
+                };
+
+                spots.unshift(newSpot);
+                saveSpots();
+
+                renderSpotsList();
+                renderMapMarkers();
+                closeModal();
+
+                // Focus on new marker
+                map.flyTo([lat, lng], 15);
+
+                showToast('🎉 ¡Casa registrada con éxito en San Luis Potosí!');
+                this.reset();
+            });
+        }
+
+        // Helper: Toast Notifications
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-message').textContent = msg;
+            toast.classList.remove('hidden');
+
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3500);
+        }
+
+        // Helper: Escape HTML string
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>"']/g, function(m) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                }[m];
+            });
+        }
+    </script>
+</body>
+</html>
+```
